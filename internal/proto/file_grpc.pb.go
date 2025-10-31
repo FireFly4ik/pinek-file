@@ -19,10 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FileService_UploadFile_FullMethodName = "/file.FileService/UploadFile"
-	FileService_GetFile_FullMethodName    = "/file.FileService/GetFile"
-	FileService_GetFiles_FullMethodName   = "/file.FileService/GetFiles"
-	FileService_DeleteFile_FullMethodName = "/file.FileService/DeleteFile"
+	FileService_UploadFile_FullMethodName  = "/file.FileService/UploadFile"
+	FileService_UploadFiles_FullMethodName = "/file.FileService/UploadFiles"
+	FileService_GetFile_FullMethodName     = "/file.FileService/GetFile"
+	FileService_GetFiles_FullMethodName    = "/file.FileService/GetFiles"
+	FileService_DeleteFile_FullMethodName  = "/file.FileService/DeleteFile"
+	FileService_DeleteFiles_FullMethodName = "/file.FileService/DeleteFiles"
 )
 
 // FileServiceClient is the client API for FileService service.
@@ -31,12 +33,16 @@ const (
 type FileServiceClient interface {
 	// Клиент стримит файл (по частям), а сервер сохраняет его в MinIO
 	UploadFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadFileRequest, UploadFileResponse], error)
-	// Клиент запрашивает 1 файл по ID, сервер стримит его содержимое
-	GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileChunk], error)
-	// Клиент передаёт список ID, сервер стримит файлы последовательно
-	GetFiles(ctx context.Context, in *GetFilesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MultiFileChunk], error)
+	// Клиент стримит несколько файлов (по частям), сервер сохраняет их в MinIO
+	UploadFiles(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadFilesRequest, UploadFilesResponse], error)
+	// Клиент запрашивает 1 файл по ID, сервер отправляет его url для скачивания
+	GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (*GetFileResponse, error)
+	// Клиент передаёт список ID, сервер отправляет urls для скачивания файлов
+	GetFiles(ctx context.Context, in *GetFilesRequest, opts ...grpc.CallOption) (*GetFilesResponse, error)
 	// Удаляет один файл по ID
 	DeleteFile(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*DeleteFileResponse, error)
+	// Удаляет несколько файлов по списку ID
+	DeleteFiles(ctx context.Context, in *DeleteFilesRequest, opts ...grpc.CallOption) (*DeleteFileResponse, error)
 }
 
 type fileServiceClient struct {
@@ -60,48 +66,53 @@ func (c *fileServiceClient) UploadFile(ctx context.Context, opts ...grpc.CallOpt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileService_UploadFileClient = grpc.ClientStreamingClient[UploadFileRequest, UploadFileResponse]
 
-func (c *fileServiceClient) GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileChunk], error) {
+func (c *fileServiceClient) UploadFiles(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[UploadFilesRequest, UploadFilesResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &FileService_ServiceDesc.Streams[1], FileService_GetFile_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &FileService_ServiceDesc.Streams[1], FileService_UploadFiles_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetFileRequest, FileChunk]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
+	x := &grpc.GenericClientStream[UploadFilesRequest, UploadFilesResponse]{ClientStream: stream}
 	return x, nil
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type FileService_GetFileClient = grpc.ServerStreamingClient[FileChunk]
+type FileService_UploadFilesClient = grpc.ClientStreamingClient[UploadFilesRequest, UploadFilesResponse]
 
-func (c *fileServiceClient) GetFiles(ctx context.Context, in *GetFilesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MultiFileChunk], error) {
+func (c *fileServiceClient) GetFile(ctx context.Context, in *GetFileRequest, opts ...grpc.CallOption) (*GetFileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &FileService_ServiceDesc.Streams[2], FileService_GetFiles_FullMethodName, cOpts...)
+	out := new(GetFileResponse)
+	err := c.cc.Invoke(ctx, FileService_GetFile_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GetFilesRequest, MultiFileChunk]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type FileService_GetFilesClient = grpc.ServerStreamingClient[MultiFileChunk]
+func (c *fileServiceClient) GetFiles(ctx context.Context, in *GetFilesRequest, opts ...grpc.CallOption) (*GetFilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetFilesResponse)
+	err := c.cc.Invoke(ctx, FileService_GetFiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *fileServiceClient) DeleteFile(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*DeleteFileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteFileResponse)
 	err := c.cc.Invoke(ctx, FileService_DeleteFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *fileServiceClient) DeleteFiles(ctx context.Context, in *DeleteFilesRequest, opts ...grpc.CallOption) (*DeleteFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteFileResponse)
+	err := c.cc.Invoke(ctx, FileService_DeleteFiles_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -114,12 +125,16 @@ func (c *fileServiceClient) DeleteFile(ctx context.Context, in *DeleteFileReques
 type FileServiceServer interface {
 	// Клиент стримит файл (по частям), а сервер сохраняет его в MinIO
 	UploadFile(grpc.ClientStreamingServer[UploadFileRequest, UploadFileResponse]) error
-	// Клиент запрашивает 1 файл по ID, сервер стримит его содержимое
-	GetFile(*GetFileRequest, grpc.ServerStreamingServer[FileChunk]) error
-	// Клиент передаёт список ID, сервер стримит файлы последовательно
-	GetFiles(*GetFilesRequest, grpc.ServerStreamingServer[MultiFileChunk]) error
+	// Клиент стримит несколько файлов (по частям), сервер сохраняет их в MinIO
+	UploadFiles(grpc.ClientStreamingServer[UploadFilesRequest, UploadFilesResponse]) error
+	// Клиент запрашивает 1 файл по ID, сервер отправляет его url для скачивания
+	GetFile(context.Context, *GetFileRequest) (*GetFileResponse, error)
+	// Клиент передаёт список ID, сервер отправляет urls для скачивания файлов
+	GetFiles(context.Context, *GetFilesRequest) (*GetFilesResponse, error)
 	// Удаляет один файл по ID
 	DeleteFile(context.Context, *DeleteFileRequest) (*DeleteFileResponse, error)
+	// Удаляет несколько файлов по списку ID
+	DeleteFiles(context.Context, *DeleteFilesRequest) (*DeleteFileResponse, error)
 	mustEmbedUnimplementedFileServiceServer()
 }
 
@@ -133,14 +148,20 @@ type UnimplementedFileServiceServer struct{}
 func (UnimplementedFileServiceServer) UploadFile(grpc.ClientStreamingServer[UploadFileRequest, UploadFileResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method UploadFile not implemented")
 }
-func (UnimplementedFileServiceServer) GetFile(*GetFileRequest, grpc.ServerStreamingServer[FileChunk]) error {
-	return status.Errorf(codes.Unimplemented, "method GetFile not implemented")
+func (UnimplementedFileServiceServer) UploadFiles(grpc.ClientStreamingServer[UploadFilesRequest, UploadFilesResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method UploadFiles not implemented")
 }
-func (UnimplementedFileServiceServer) GetFiles(*GetFilesRequest, grpc.ServerStreamingServer[MultiFileChunk]) error {
-	return status.Errorf(codes.Unimplemented, "method GetFiles not implemented")
+func (UnimplementedFileServiceServer) GetFile(context.Context, *GetFileRequest) (*GetFileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFile not implemented")
+}
+func (UnimplementedFileServiceServer) GetFiles(context.Context, *GetFilesRequest) (*GetFilesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetFiles not implemented")
 }
 func (UnimplementedFileServiceServer) DeleteFile(context.Context, *DeleteFileRequest) (*DeleteFileResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteFile not implemented")
+}
+func (UnimplementedFileServiceServer) DeleteFiles(context.Context, *DeleteFilesRequest) (*DeleteFileResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteFiles not implemented")
 }
 func (UnimplementedFileServiceServer) mustEmbedUnimplementedFileServiceServer() {}
 func (UnimplementedFileServiceServer) testEmbeddedByValue()                     {}
@@ -170,27 +191,48 @@ func _FileService_UploadFile_Handler(srv interface{}, stream grpc.ServerStream) 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FileService_UploadFileServer = grpc.ClientStreamingServer[UploadFileRequest, UploadFileResponse]
 
-func _FileService_GetFile_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetFileRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(FileServiceServer).GetFile(m, &grpc.GenericServerStream[GetFileRequest, FileChunk]{ServerStream: stream})
+func _FileService_UploadFiles_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(FileServiceServer).UploadFiles(&grpc.GenericServerStream[UploadFilesRequest, UploadFilesResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type FileService_GetFileServer = grpc.ServerStreamingServer[FileChunk]
+type FileService_UploadFilesServer = grpc.ClientStreamingServer[UploadFilesRequest, UploadFilesResponse]
 
-func _FileService_GetFiles_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GetFilesRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _FileService_GetFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(FileServiceServer).GetFiles(m, &grpc.GenericServerStream[GetFilesRequest, MultiFileChunk]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(FileServiceServer).GetFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FileService_GetFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServiceServer).GetFile(ctx, req.(*GetFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type FileService_GetFilesServer = grpc.ServerStreamingServer[MultiFileChunk]
+func _FileService_GetFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServiceServer).GetFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FileService_GetFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServiceServer).GetFiles(ctx, req.(*GetFilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _FileService_DeleteFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteFileRequest)
@@ -210,6 +252,24 @@ func _FileService_DeleteFile_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _FileService_DeleteFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteFilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FileServiceServer).DeleteFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FileService_DeleteFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FileServiceServer).DeleteFiles(ctx, req.(*DeleteFilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FileService_ServiceDesc is the grpc.ServiceDesc for FileService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -218,8 +278,20 @@ var FileService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*FileServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "GetFile",
+			Handler:    _FileService_GetFile_Handler,
+		},
+		{
+			MethodName: "GetFiles",
+			Handler:    _FileService_GetFiles_Handler,
+		},
+		{
 			MethodName: "DeleteFile",
 			Handler:    _FileService_DeleteFile_Handler,
+		},
+		{
+			MethodName: "DeleteFiles",
+			Handler:    _FileService_DeleteFiles_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -229,14 +301,9 @@ var FileService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "GetFile",
-			Handler:       _FileService_GetFile_Handler,
-			ServerStreams: true,
-		},
-		{
-			StreamName:    "GetFiles",
-			Handler:       _FileService_GetFiles_Handler,
-			ServerStreams: true,
+			StreamName:    "UploadFiles",
+			Handler:       _FileService_UploadFiles_Handler,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "file.proto",

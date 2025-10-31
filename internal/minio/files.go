@@ -101,7 +101,7 @@ func (m *minioClient) CreateMany(data []FileDataType) ([]string, []string, error
 		uuids = append(uuids, combo.ObjectID)
 	}
 
-	return urls, uuids, nil
+	return uuids, urls, nil
 }
 
 func (m *minioClient) GetOne(objectID string) (string, error) {
