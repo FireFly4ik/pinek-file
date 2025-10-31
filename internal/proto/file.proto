@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package file;
+option go_package = "./";
+
+// ----------- Service -----------
+
+service FileService {
+  // Клиент стримит файл (по частям), а сервер сохраняет его в MinIO
+  rpc UploadFile (stream UploadFileRequest) returns (UploadFileResponse);
+
+  // Клиент запрашивает 1 файл по ID, сервер стримит его содержимое
+  rpc GetFile (GetFileRequest) returns (stream FileChunk);
+
+  // Клиент передаёт список ID, сервер стримит файлы последовательно
+  rpc GetFiles (GetFilesRequest) returns (stream MultiFileChunk);
+
+  // Удаляет один файл по ID
+  rpc DeleteFile (DeleteFileRequest) returns (DeleteFileResponse);
+}
+
+// ----------- Requests -----------
+
+
+message UploadFileRequest {
+  // Первая часть (метаданные)
+  string file_name = 1;
+  string content_type = 2;
+  bytes data = 3; // Содержимое файла (может приходить в нескольких чанках)
+}
+
+message GetFileRequest {
+  string file_id = 1;
+}
+
+message GetFilesRequest {
+  repeated string file_ids = 1;
+}
+
+message DeleteFileRequest {
+  string file_id = 1;
+}
+
+// ----------- Responses -----------
+
+message UploadFileResponse {
+  string file_id = 1;  // Уникальный ID, по которому можно получить файл
+  string message = 2;
+}
+
+message FileChunk {
+  bytes data = 1; // Данные файла по частям
+}
+
+message MultiFileChunk {
+  string file_id = 1;
+  bytes data = 2;
+  bool is_last_chunk = 3; // Позволяет клиенту понимать границы файлов
+}
+
+message DeleteFileResponse {
+  string message = 1;
+}
