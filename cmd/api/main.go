@@ -7,6 +7,7 @@ import (
 	"file/internal/consul"
 	grpcService "file/internal/grpc"
 	"file/internal/logger"
+	"file/internal/minio"
 	pb "file/internal/proto"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -28,6 +29,8 @@ func main() {
 
 	logger.Setup(envConf.ProductionType)
 
+	minioClient := minio.NewMinioClient(envConf)
+
 	consulProvider := consul.NewProvider(envConf)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", envConf.Port))
@@ -35,7 +38,7 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to listen: %v")
 	}
 
-	server := grpcService.NewFileServer(envConf)
+	server := grpcService.NewFileServer(envConf, minioClient)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterFileServiceServer(grpcServer, server)
@@ -70,6 +73,8 @@ func main() {
 	case <-done:
 		log.Info().Msg("gRPC server stopped gracefully")
 	}
+
+	minioClient.Close()
 
 	consulProvider.DeregisterService()
 
