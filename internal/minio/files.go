@@ -62,28 +62,26 @@ func (m *minioClient) GetOne(objectID string) (string, error) {
 }
 
 func (m *minioClient) GetMany(objectIDs []string) []string {
-	urls := make([]string, 0, len(objectIDs))
-
 	var wg sync.WaitGroup
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	for i, objectID := range objectIDs {
+	for i, _ := range objectIDs {
 		wg.Add(1)
-		go func(i int, objectID string) {
+		go func(i int) {
 			defer wg.Done()
-			url, err := m.GetOne(objectID)
+			url, err := m.GetOne(objectIDs[i])
 			if err != nil {
-				log.Error().Err(err).Msgf("ошибка при получении объекта %s", objectID)
+				log.Error().Err(err).Msgf("ошибка при получении объекта %s", objectIDs[i])
 				return
 			}
-			urls[i] = url
-		}(i, objectID)
+			objectIDs[i] = url
+		}(i)
 	}
 
 	wg.Wait()
 
-	return urls
+	return objectIDs
 }
 
 func (m *minioClient) DeleteOne(objectID string) error {
@@ -95,8 +93,10 @@ func (m *minioClient) DeleteOne(objectID string) error {
 	return nil
 }
 
-func (m *minioClient) DeleteMany(objectIDs []string) {
+func (m *minioClient) DeleteMany(objectIDs []string) bool {
 	var wg sync.WaitGroup
+
+	errors := false
 
 	for _, objectID := range objectIDs {
 		wg.Add(1)
@@ -106,9 +106,11 @@ func (m *minioClient) DeleteMany(objectIDs []string) {
 			err := m.mc.RemoveObject(context.Background(), m.bucketName, id, minio.RemoveObjectOptions{})
 			if err != nil {
 				log.Error().Err(err).Msgf("ошибка при удалении объекта %s", id)
+				errors = true
 			}
 		}(objectID)
 	}
 
 	wg.Wait()
+	return errors
 }

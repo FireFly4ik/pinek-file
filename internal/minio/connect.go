@@ -16,7 +16,7 @@ type Client interface {
 	GetOne(objectID string) (string, error)
 	GetMany(objectIDs []string) []string
 	DeleteOne(objectID string) error
-	DeleteMany(objectIDs []string)
+	DeleteMany(objectIDs []string) bool
 	Close()
 }
 
