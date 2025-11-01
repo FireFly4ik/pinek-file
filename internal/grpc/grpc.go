@@ -2,9 +2,11 @@ package grpc
 
 import (
 	"bytes"
+	"context"
 	"file/internal/config"
 	"file/internal/minio"
 	pb "file/internal/proto"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -67,18 +69,45 @@ func (fs *FileServiceServer) UploadFile(stream grpc.ClientStreamingServer[pb.Upl
 	return stream.SendAndClose(resp)
 }
 
-//func (fs *FileServiceServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, error) {
-//
-//}
-//
-//func (fs *FileServiceServer) GetFiles(ctx context.Context, req *pb.GetFilesRequest) (*pb.GetFilesResponse, error) {
-//
-//}
-//
-//func (fs *FileServiceServer) DeleteFile(ctx context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, error) {
-//
-//}
-//
-//func (fs *FileServiceServer) DeleteFiles(ctx context.Context, req *pb.DeleteFilesRequest) (*pb.DeleteFileResponse, error) {
-//
-//}
+func (fs *FileServiceServer) GetFile(ctx context.Context, req *pb.GetFileRequest) (*pb.GetFileResponse, error) {
+	fileUrl, err := fs.minio.GetOne(req.FileId)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get file from minio")
+		return nil, status.Errorf(codes.Internal, "failed to get file: %v", err)
+	}
+
+	return &pb.GetFileResponse{
+		FileUrl: fileUrl,
+	}, nil
+}
+
+func (fs *FileServiceServer) GetFiles(ctx context.Context, req *pb.GetFilesRequest) (*pb.GetFilesResponse, error) {
+	fileUrls := fs.minio.GetMany(req.FileIds)
+	return &pb.GetFilesResponse{
+		FileUrls: fileUrls,
+	}, nil
+}
+
+func (fs *FileServiceServer) DeleteFile(ctx context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, error) {
+	err := fs.minio.DeleteOne(req.FileId)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to delete file from minio")
+		return nil, status.Errorf(codes.Internal, "failed to delete file: %v", err)
+	}
+
+	return &pb.DeleteFileResponse{
+		Message: "File deleted successfully",
+	}, nil
+}
+
+func (fs *FileServiceServer) DeleteFiles(ctx context.Context, req *pb.DeleteFilesRequest) (*pb.DeleteFileResponse, error) {
+	hasErrors := fs.minio.DeleteMany(req.FileIds)
+	if hasErrors {
+		return &pb.DeleteFileResponse{
+			Message: "Some files were deleted, but some errors occurred",
+		}, nil
+	}
+	return &pb.DeleteFileResponse{
+		Message: "Files deleted successfully",
+	}, nil
+}
