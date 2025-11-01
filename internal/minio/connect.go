@@ -13,7 +13,6 @@ import (
 // Client интерфейс для взаимодействия с Minio
 type Client interface {
 	CreateOne(file FileDataType) (string, string, error)
-	CreateMany([]FileDataType) ([]string, []string, error)
 	GetOne(objectID string) (string, error)
 	GetMany(objectIDs []string) []string
 	DeleteOne(objectID string) error

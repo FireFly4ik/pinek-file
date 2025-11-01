@@ -9,9 +9,6 @@ service FileService {
   // Клиент стримит файл (по частям), а сервер сохраняет его в MinIO
   rpc UploadFile (stream UploadFileRequest) returns (UploadFileResponse);
 
-  // Клиент стримит несколько файлов (по частям), сервер сохраняет их в MinIO
-  rpc UploadFiles (stream UploadFilesRequest) returns (UploadFilesResponse);
-
   // Клиент запрашивает 1 файл по ID, сервер отправляет его url для скачивания
   rpc GetFile (GetFileRequest) returns (GetFileResponse);
 
@@ -31,11 +28,6 @@ service FileService {
 message UploadFileRequest {
   string file_name = 1;
   bytes data = 2; // Содержимое файла (может приходить в нескольких чанках)
-}
-
-message UploadFilesRequest {
-  repeated string file_name = 1;
-  bytes data = 2; // Содержимое файлов (может приходить в нескольких чанках)
 }
 
 message GetFileRequest {
@@ -59,12 +51,6 @@ message DeleteFilesRequest {
 message UploadFileResponse {
   string file_id = 1;  // Уникальный ID, по которому можно получить файл
   string file_url = 2; // URL для доступа к файлу
-  string message = 3;
-}
-
-message UploadFilesResponse {
-  repeated string file_ids = 1;  // Список уникальных ID для полученных файлов
-  repeated string file_urls = 2; // Список URL для доступа к файлам
   string message = 3;
 }
 
