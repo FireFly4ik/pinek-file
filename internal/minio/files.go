@@ -7,25 +7,37 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"github.com/rs/zerolog/log"
+	"strings"
 	"sync"
 	"time"
 )
 
 type FileDataType struct {
 	FileName string
-	Data     []byte
+	Data     *bytes.Reader
 }
 
 func (m *minioClient) CreateOne(file FileDataType) (string, string, error) {
 	objectID := uuid.New().String()
-
-	reader := bytes.NewReader(file.Data)
+	contentType := "image/jpeg"
+	if strings.Split(file.FileName, "."); len(strings.Split(file.FileName, ".")) > 1 {
+		extension := strings.ToLower(strings.Split(file.FileName, ".")[1])
+		switch extension {
+		case "png":
+			contentType = "image/png"
+		case "gif":
+			contentType = "image/gif"
+		}
+		objectID += "." + extension
+	}
 
 	m.wg.Add(1)
 	defer m.wg.Done()
 
 	// Загрузка данных в бакет Minio с использованием контекста для возможности отмены операции.
-	_, err := m.mc.PutObject(context.Background(), m.bucketName, objectID, reader, int64(len(file.Data)), minio.PutObjectOptions{})
+	_, err := m.mc.PutObject(context.Background(), m.bucketName, objectID, file.Data, file.Data.Size(), minio.PutObjectOptions{
+		ContentType: contentType,
+	})
 	if err != nil {
 		return "", "", fmt.Errorf("ошибка при создании объекта %s: %v", file.FileName, err)
 	}
@@ -37,71 +49,6 @@ func (m *minioClient) CreateOne(file FileDataType) (string, string, error) {
 	}
 
 	return objectID, url.String(), nil
-}
-
-func (m *minioClient) CreateMany(data []FileDataType) ([]string, []string, error) {
-	urls := make([]string, 0, len(data))
-	uuids := make([]string, 0, len(data))
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	filesCh := make(chan struct {
-		ObjectID string
-		URL      string
-	}, len(data))
-
-	var wg sync.WaitGroup
-
-	for _, file := range data {
-		m.wg.Add(1)
-		wg.Add(1)
-
-		go func(file FileDataType) {
-			defer wg.Done()
-			defer m.wg.Done()
-
-			objectID := uuid.New().String()
-
-			// Загрузка данных в бакет Minio
-			_, err := m.mc.PutObject(ctx, m.bucketName, objectID, bytes.NewReader(file.Data), int64(len(file.Data)), minio.PutObjectOptions{})
-			if err != nil {
-				cancel()
-				return
-			}
-
-			// Получение URL для загруженного объекта
-			url, err := m.mc.PresignedGetObject(ctx, m.bucketName, objectID, time.Second*24*60*60, nil)
-			if err != nil {
-				cancel()
-				return
-			}
-
-			combo := struct {
-				ObjectID string
-				URL      string
-			}{
-				ObjectID: objectID,
-				URL:      url.String(),
-			}
-
-			filesCh <- combo
-		}(file)
-	}
-
-	if ctx.Err() != nil {
-		return nil, nil, fmt.Errorf("ошибка при создании объектов: операция была отменена")
-	}
-
-	wg.Wait()
-	close(filesCh)
-
-	for combo := range filesCh {
-		urls = append(urls, combo.URL)
-		uuids = append(uuids, combo.ObjectID)
-	}
-
-	return uuids, urls, nil
 }
 
 func (m *minioClient) GetOne(objectID string) (string, error) {
