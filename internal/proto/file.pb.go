@@ -24,7 +24,8 @@ const (
 type UploadFileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileName      string                 `protobuf:"bytes,1,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
-	Data          []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"` // Содержимое файла (может приходить в нескольких чанках)
+	FileOwner     string                 `protobuf:"bytes,2,opt,name=file_owner,json=fileOwner,proto3" json:"file_owner,omitempty"`
+	Data          []byte                 `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"` // Содержимое файла (может приходить в нескольких чанках)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62,6 +63,13 @@ func (*UploadFileRequest) Descriptor() ([]byte, []int) {
 func (x *UploadFileRequest) GetFileName() string {
 	if x != nil {
 		return x.FileName
+	}
+	return ""
+}
+
+func (x *UploadFileRequest) GetFileOwner() string {
+	if x != nil {
+		return x.FileOwner
 	}
 	return ""
 }
@@ -164,6 +172,7 @@ func (x *GetFilesRequest) GetFileIds() []string {
 type DeleteFileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileId        string                 `protobuf:"bytes,1,opt,name=file_id,json=fileId,proto3" json:"file_id,omitempty"`
+	FileOwner     string                 `protobuf:"bytes,2,opt,name=file_owner,json=fileOwner,proto3" json:"file_owner,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -205,9 +214,17 @@ func (x *DeleteFileRequest) GetFileId() string {
 	return ""
 }
 
+func (x *DeleteFileRequest) GetFileOwner() string {
+	if x != nil {
+		return x.FileOwner
+	}
+	return ""
+}
+
 type DeleteFilesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	FileIds       []string               `protobuf:"bytes,1,rep,name=file_ids,json=fileIds,proto3" json:"file_ids,omitempty"`
+	FileOwner     string                 `protobuf:"bytes,2,opt,name=file_owner,json=fileOwner,proto3" json:"file_owner,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -247,6 +264,13 @@ func (x *DeleteFilesRequest) GetFileIds() []string {
 		return x.FileIds
 	}
 	return nil
+}
+
+func (x *DeleteFilesRequest) GetFileOwner() string {
+	if x != nil {
+		return x.FileOwner
+	}
+	return ""
 }
 
 type UploadFileResponse struct {
@@ -446,18 +470,24 @@ var File_file_proto protoreflect.FileDescriptor
 const file_file_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"file.proto\x12\x04file\"D\n" +
+	"file.proto\x12\x04file\"c\n" +
 	"\x11UploadFileRequest\x12\x1b\n" +
-	"\tfile_name\x18\x01 \x01(\tR\bfileName\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04data\")\n" +
+	"\tfile_name\x18\x01 \x01(\tR\bfileName\x12\x1d\n" +
+	"\n" +
+	"file_owner\x18\x02 \x01(\tR\tfileOwner\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\")\n" +
 	"\x0eGetFileRequest\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\",\n" +
 	"\x0fGetFilesRequest\x12\x19\n" +
-	"\bfile_ids\x18\x01 \x03(\tR\afileIds\",\n" +
+	"\bfile_ids\x18\x01 \x03(\tR\afileIds\"K\n" +
 	"\x11DeleteFileRequest\x12\x17\n" +
-	"\afile_id\x18\x01 \x01(\tR\x06fileId\"/\n" +
+	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x1d\n" +
+	"\n" +
+	"file_owner\x18\x02 \x01(\tR\tfileOwner\"N\n" +
 	"\x12DeleteFilesRequest\x12\x19\n" +
-	"\bfile_ids\x18\x01 \x03(\tR\afileIds\"b\n" +
+	"\bfile_ids\x18\x01 \x03(\tR\afileIds\x12\x1d\n" +
+	"\n" +
+	"file_owner\x18\x02 \x01(\tR\tfileOwner\"b\n" +
 	"\x12UploadFileResponse\x12\x17\n" +
 	"\afile_id\x18\x01 \x01(\tR\x06fileId\x12\x19\n" +
 	"\bfile_url\x18\x02 \x01(\tR\afileUrl\x12\x18\n" +

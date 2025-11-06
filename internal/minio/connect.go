@@ -15,8 +15,8 @@ type Client interface {
 	CreateOne(file FileDataType) (string, string, error)
 	GetOne(objectID string) (string, error)
 	GetMany(objectIDs []string) []string
-	DeleteOne(objectID string) error
-	DeleteMany(objectIDs []string) bool
+	DeleteOne(objectID string, fileOwner string) error
+	DeleteMany(objectIDs []string, fileOwner string) bool
 	Close()
 }
 

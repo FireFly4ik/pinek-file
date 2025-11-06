@@ -13,8 +13,9 @@ import (
 )
 
 type FileDataType struct {
-	FileName string
-	Data     *bytes.Reader
+	FileName  string
+	FileOwner string
+	Data      *bytes.Reader
 }
 
 func (m *minioClient) CreateOne(file FileDataType) (string, string, error) {
@@ -37,6 +38,9 @@ func (m *minioClient) CreateOne(file FileDataType) (string, string, error) {
 	// Загрузка данных в бакет Minio с использованием контекста для возможности отмены операции.
 	_, err := m.mc.PutObject(context.Background(), m.bucketName, objectID, file.Data, file.Data.Size(), minio.PutObjectOptions{
 		ContentType: contentType,
+		UserMetadata: map[string]string{
+			"File-Owner": file.FileOwner,
+		},
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("ошибка при создании объекта %s: %v", file.FileName, err)
@@ -84,16 +88,27 @@ func (m *minioClient) GetMany(objectIDs []string) []string {
 	return objectIDs
 }
 
-func (m *minioClient) DeleteOne(objectID string) error {
+func (m *minioClient) DeleteOne(objectID string, fileOwner string) error {
+	// Получение метаданных объекта для проверки владельца.
+	objInfo, err := m.mc.StatObject(context.Background(), m.bucketName, objectID, minio.StatObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("ошибка при получении информации об объекте %s: %v", objectID, err)
+	}
+
+	// Проверка, совпадает ли владелец файла с предоставленным.
+	if owner, ok := objInfo.UserMetadata["File-Owner"]; !ok || owner != fileOwner {
+		return fmt.Errorf("пользователь не является владельцем файла")
+	}
+
 	// Удаление объекта из бакета Minio.
-	err := m.mc.RemoveObject(context.Background(), m.bucketName, objectID, minio.RemoveObjectOptions{})
+	err = m.mc.RemoveObject(context.Background(), m.bucketName, objectID, minio.RemoveObjectOptions{})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *minioClient) DeleteMany(objectIDs []string) bool {
+func (m *minioClient) DeleteMany(objectIDs []string, fileOwner string) bool {
 	var wg sync.WaitGroup
 
 	errors := false
@@ -103,7 +118,7 @@ func (m *minioClient) DeleteMany(objectIDs []string) bool {
 		go func(id string) {
 			defer wg.Done()
 
-			err := m.mc.RemoveObject(context.Background(), m.bucketName, id, minio.RemoveObjectOptions{})
+			err := m.DeleteOne(id, fileOwner)
 			if err != nil {
 				log.Error().Err(err).Msgf("ошибка при удалении объекта %s", id)
 				errors = true

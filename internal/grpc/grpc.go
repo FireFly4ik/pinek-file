@@ -28,8 +28,9 @@ func NewFileServer(cfg *config.Config, minioClient minio.Client) *FileServiceSer
 
 func (fs *FileServiceServer) UploadFile(stream grpc.ClientStreamingServer[pb.UploadFileRequest, pb.UploadFileResponse]) error {
 	var (
-		fileName string
-		buffer   bytes.Buffer
+		fileName  string
+		fileOwner string
+		buffer    bytes.Buffer
 	)
 
 	for {
@@ -45,6 +46,10 @@ func (fs *FileServiceServer) UploadFile(stream grpc.ClientStreamingServer[pb.Upl
 			fileName = req.FileName
 		}
 
+		if fileOwner == "" {
+			fileOwner = req.FileOwner
+		}
+
 		_, err = buffer.Write(req.Data)
 		if err != nil {
 			return status.Errorf(codes.Internal, "failed to write buffer: %v", err)
@@ -52,8 +57,9 @@ func (fs *FileServiceServer) UploadFile(stream grpc.ClientStreamingServer[pb.Upl
 	}
 
 	file := minio.FileDataType{
-		FileName: fileName,
-		Data:     bytes.NewReader(buffer.Bytes()),
+		FileName:  fileName,
+		FileOwner: fileOwner,
+		Data:      bytes.NewReader(buffer.Bytes()),
 	}
 
 	objectID, url, err := fs.minio.CreateOne(file)
@@ -89,7 +95,7 @@ func (fs *FileServiceServer) GetFiles(ctx context.Context, req *pb.GetFilesReque
 }
 
 func (fs *FileServiceServer) DeleteFile(ctx context.Context, req *pb.DeleteFileRequest) (*pb.DeleteFileResponse, error) {
-	err := fs.minio.DeleteOne(req.FileId)
+	err := fs.minio.DeleteOne(req.FileId, req.FileOwner)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to delete file from minio")
 		return nil, status.Errorf(codes.Internal, "failed to delete file: %v", err)
@@ -101,7 +107,7 @@ func (fs *FileServiceServer) DeleteFile(ctx context.Context, req *pb.DeleteFileR
 }
 
 func (fs *FileServiceServer) DeleteFiles(ctx context.Context, req *pb.DeleteFilesRequest) (*pb.DeleteFileResponse, error) {
-	hasErrors := fs.minio.DeleteMany(req.FileIds)
+	hasErrors := fs.minio.DeleteMany(req.FileIds, req.FileOwner)
 	if hasErrors {
 		return &pb.DeleteFileResponse{
 			Message: "Some files were deleted, but some errors occurred",

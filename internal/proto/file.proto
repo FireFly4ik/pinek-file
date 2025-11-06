@@ -27,7 +27,8 @@ service FileService {
 
 message UploadFileRequest {
   string file_name = 1;
-  bytes data = 2; // Содержимое файла (может приходить в нескольких чанках)
+  string file_owner = 2;
+  bytes data = 3; // Содержимое файла (может приходить в нескольких чанках)
 }
 
 message GetFileRequest {
@@ -40,10 +41,12 @@ message GetFilesRequest {
 
 message DeleteFileRequest {
   string file_id = 1;
+  string file_owner = 2;
 }
 
 message DeleteFilesRequest {
   repeated string file_ids = 1;
+  string file_owner = 2;
 }
 
 // ----------- Responses -----------
