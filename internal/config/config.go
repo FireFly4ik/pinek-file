@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -34,9 +36,28 @@ type Minio struct {
 	UseSSL       string
 }
 
+func getIPAddress() string {
+	resp, err := http.Get("https://ifconfig.me/ip")
+	if err != nil {
+		panic(fmt.Sprintf("failed to get public IP address: %v", err))
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		panic(fmt.Sprintf("failed to get public IP address: received status code %d", resp.StatusCode))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read response body: %v", err))
+	}
+
+	return string(body)
+}
+
 func NewEnvConfig() *Config {
 	return &Config{
-		Address:        os.Getenv("ADDRESS"),
+		Address:        getIPAddress(),
 		Port:           os.Getenv("PORT"),
 		ProductionType: os.Getenv("PRODUCTION_TYPE"),
 
